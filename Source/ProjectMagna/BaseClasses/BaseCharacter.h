@@ -8,6 +8,7 @@
 #include "Components/WidgetComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "ProjectMagna/Interfaces/CombatInterface.h"
 #include "ProjectMagna/Interfaces/InteractionInterface.h"
 #include "ProjectMagna/Interfaces/MagnaInterface.h"
 #include "BaseCharacter.generated.h"
@@ -21,7 +22,7 @@ class UPlayerNameplate;
 
 
 UCLASS()
-class PROJECTMAGNA_API ABaseCharacter : public ACharacter, public IMagnaInterface, public IInteractionInterface
+class PROJECTMAGNA_API ABaseCharacter : public ACharacter, public IMagnaInterface, public IInteractionInterface, public ICombatInterface
 {
 	GENERATED_BODY()
 
@@ -57,7 +58,7 @@ public:
 	void SetActionState(const EActionState State, const bool bNewValue);
 
 	UFUNCTION()
-	void OnRep_ActionState();
+	void OnRep_RepActionState();
 	
 	UFUNCTION()
 	void SetDefaultState(const bool bNewValue);
@@ -75,7 +76,7 @@ public:
 	void OnSpectatingUpdate();
 
 	UFUNCTION()
-	void OnRep_CurrentEquipment();
+	void OnRep_RepEquipment();
 
 	UFUNCTION()
 	void OnRep_WeaponPrimary();
@@ -84,13 +85,13 @@ public:
 	void OnRep_WeaponSecondary();
 
 	UFUNCTION(Server, Reliable)
-	void ServerPickupWeapon(const EWeapon Weapon);
+	void ServerPickupWeapon(const uint8 WeaponID);
 
 	UFUNCTION(Server, Reliable)
 	void ServerEquipWeapon(const EEquipment NewEquipment);
 
 	UFUNCTION()
-	void EquipWeapon(const EEquipment NewEquipment);
+	void EquipWeapon(const EEquipment NewEquipment, const bool bForce = true, const bool bReplicate = false);
 
 	UFUNCTION()
 	ABaseWeapon* GetPlayerWeapon(const EEquipment Equipment);
@@ -109,6 +110,9 @@ public:
 
 	UFUNCTION()
 	void StartHealthRegeneration();
+
+	UFUNCTION()
+	void StopHealthRegeneration();
 
 	UFUNCTION()
 	void UpdateHealthRegen();
@@ -179,8 +183,11 @@ public:
 	UPROPERTY()
 	UPlayerNameplate* PlayerNameplate;
 
-	UPROPERTY(ReplicatedUsing = OnRep_ActionState)
-	EActionState ActionState;
+	UPROPERTY(ReplicatedUsing = OnRep_RepActionState)
+	EActionState RepActionState;
+
+	UPROPERTY()
+	EActionState CurrentActionState;
 
 	UPROPERTY()
 	EActionState PreviousActionState;
@@ -194,7 +201,10 @@ public:
 	UPROPERTY()
 	FTimerHandle SpectatingUpdateTimer;
 
-	UPROPERTY(ReplicatedUsing = OnRep_CurrentEquipment)
+	UPROPERTY(ReplicatedUsing = OnRep_RepEquipment)
+	EEquipment RepEquipment;
+
+	UPROPERTY()
 	EEquipment CurrentEquipment;
 
 	UPROPERTY(ReplicatedUsing = OnRep_WeaponPrimary)

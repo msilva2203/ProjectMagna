@@ -80,7 +80,7 @@ void ABaseGameMode::BeginPlay()
 			if (Pickup->IsPersistent())
 			{
 				WeaponPickups.Add(Pickup);
-				Pickup->WeaponState = GetWeaponData(Pickup->Weapon)->DefaultWeaponState;
+				Pickup->WeaponState = GetWeaponData(Pickup->WeaponID)->DefaultWeaponState;
 				Pickup->SetActive(true);
 			}
 		}
@@ -111,6 +111,7 @@ void ABaseGameMode::HandleStartingNewPlayer_Implementation(APlayerController* Ne
 		GEngine->AddOnScreenDebugMessage(-1, 1.0, FColor::Cyan, TEXT("New player joined the game!"));
 		Players.Add(Player);
 		SetPlayerTeam(Player);
+		Player->SetupPlayer();
 	}
 
 	if (!GetWorldTimerManager().IsTimerActive(GameStartTimer))
@@ -132,6 +133,7 @@ void ABaseGameMode::Logout(AController* Exiting)
 void ABaseGameMode::StartGame()
 {
 	GEngine->AddOnScreenDebugMessage(-1, 2.0, FColor::Yellow, TEXT("Game Started"));
+	GetWorldTimerManager().SetTimer(GameClockTimer, this, &ABaseGameMode::GameTimeCallback, 1.0, true);
 	SpawnPlayers(Players, true);
 	
 }
@@ -143,13 +145,18 @@ void ABaseGameMode::EndGame()
 
 void ABaseGameMode::SpawnPlayers(const TArray<ABasePlayerController*>& PlayersToSpawn, bool bUsePlayerTeam)
 {
-	for (int i = 0; i < PlayersToSpawn.Num(); i++)
+	for (auto Player : PlayersToSpawn)
 	{
-		TArray<APlayerSpawner*> Spawners = FindAvailableSpawners(bUsePlayerTeam ? PlayersToSpawn[i]->GetTeam() : ETeam::None);
+		TArray<APlayerSpawner*> Spawners = FindAvailableSpawners(bUsePlayerTeam ? Player->GetTeam() : ETeam::None);
 		const int32 Index = FMath::RandRange(0, Spawners.Num()-1);
 		
-		ABaseCharacter* NewCharacter = Spawners[Index]->SpawnPlayer(PlayersToSpawn[i]);
+		ABaseCharacter* NewCharacter = Spawners[Index]->SpawnPlayer(Player);
 		this->PlayerCharacters.Add(NewCharacter);
+
+		if (!Player->bHasStarted)
+		{
+			Player->StartPlayer();
+		}
 	}
 }
 
@@ -215,13 +222,19 @@ TArray<APlayerSpawner*> ABaseGameMode::FindAvailableSpawners(const ETeam Spawner
 	return Spawners;
 }
 
-UWeaponData* ABaseGameMode::GetWeaponData(const EWeapon Weapon)
+UWeaponData* ABaseGameMode::GetWeaponData(uint8 InWeaponID)
 {
+	InWeaponID = FMath::Clamp<uint8>(InWeaponID, 0, WeaponData.Num());
+	
 	for (const auto Data : WeaponData)
 	{
-		if (Data->Weapon == Weapon)
+		if (Data->WeaponID == InWeaponID)
 			return Data;
 	}
 
 	return WeaponData[0];
+}
+
+void ABaseGameMode::GameTimeCallback()
+{
 }

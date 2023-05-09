@@ -6,24 +6,6 @@
 
 // Add default functionality here for any IInteractionInterface functions that are not pure virtual.
 
-void IInteractionInterface::Damage(AActor* DamageInstigator, FDamageData Damage)
-{
-}
-
-float IInteractionInterface::GetMaxHealth()
-{
-	return 0.0f;
-}
-
-float IInteractionInterface::GetCurrentHealth()
-{
-	return 0.0f;
-}
-
-void IInteractionInterface::SetEntitySpotted(const bool bSpotted, const bool bImmediate)
-{
-}
-
 void IInteractionInterface::AddInteractable(ABaseInteractable* InInteractable)
 {
 }

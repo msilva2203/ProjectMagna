@@ -38,20 +38,22 @@ public:
 	// Methods
 	//
 
+	virtual void StartGame();
+	virtual void EndGame();
+	virtual void GameTimeCallback();
 	virtual void HandleGameSettings(FString SettingName, int32 SelectedOption);
+	
 	void SpawnPlayers(const TArray<ABasePlayerController*>& PlayersToSpawn, bool bUsePlayerTeam = false);
 	void RemoveCharacter(ABaseCharacter* Character);
 	void SetPlayerTeam(APlayerController* Player) const;
 	ETeam FindAvailableTeam() const;
-	virtual void StartGame();
-	virtual void EndGame();
 
 	TArray<APlayerSpawner*> FindAvailableSpawners(const ETeam SpawnerTeam);
 
 	bool IsFriendlyFireActive() const { return MatchSettings.bFriendlyFire; }
 	int32 GetRespawnTime() const { return MatchSettings.RespawnTime; }
 
-	UWeaponData* GetWeaponData(const EWeapon Weapon);
+	UWeaponData* GetWeaponData(uint8 InWeaponID);
 
 		//...
 
@@ -83,13 +85,16 @@ public:
 	UPROPERTY()
 	TArray<ABaseCharacter*> PlayerCharacters;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game Data")
 	TArray<UWeaponData*> WeaponData;
 
 
 
 	UPROPERTY()
 	FTimerHandle GameStartTimer;
+
+	UPROPERTY()
+	FTimerHandle GameClockTimer;
 	
 		//...
 };

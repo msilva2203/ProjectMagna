@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ProjectMagna/ProjectMagna.h"
 #include "UObject/Interface.h"
 #include "InteractionInterface.generated.h"
 
@@ -26,10 +25,6 @@ class PROJECTMAGNA_API IInteractionInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	virtual void Damage(AActor* DamageInstigator, FDamageData Damage);
-	virtual float GetMaxHealth();
-	virtual float GetCurrentHealth();
-	virtual void SetEntitySpotted(const bool bSpotted, const bool bImmediate);
 	virtual void AddInteractable(ABaseInteractable* InInteractable);
 	virtual void RemoveInteractable(ABaseInteractable* InInteractable);
 	virtual bool IsPlayer();

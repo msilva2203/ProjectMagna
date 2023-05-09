@@ -26,5 +26,8 @@ public:
 	static FColor GetEntityColor(const ETeam PlayerTeam, const ETeam EntityTeam, const EGamemode Gamemode);
 	static FColor GetTeamColor(const ETeam Team);
 	static FText GetActionStateName(const EActionState ActionState);
+	static FText GetWeaponName(const uint8 WeaponID);
+
+	static void DrawDebugStringLines(UObject* WorldContextObject, const FVector OriginLocation, TArray<FString> DebugTextLines, FLinearColor DebugColor = FLinearColor::White);
 	
 };

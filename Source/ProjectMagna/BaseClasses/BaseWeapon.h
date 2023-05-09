@@ -59,15 +59,18 @@ public:
 	UFUNCTION()
 	void Attack() const;
 
+	UFUNCTION()
+	void DropWeapon();
 
 
-	UPROPERTY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Data")
 	UWeaponData* WeaponData;
 
 	UPROPERTY()
 	UStaticMeshComponent* WeaponMesh;
 
-	UPROPERTY(Replicated)
+	UPROPERTY()
 	ABasePlayerController* Player;
 
 	UPROPERTY(Replicated)

@@ -3,6 +3,7 @@
 
 #include "KillVolume.h"
 
+#include "ProjectMagna/Interfaces/CombatInterface.h"
 #include "ProjectMagna/Interfaces/InteractionInterface.h"
 
 
@@ -45,7 +46,7 @@ void AKillVolume::OnBoxBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor*
 {
 	if (GetWorld()->GetNetMode() < NM_Client)
 	{
-		IInteractionInterface* Interface = Cast<IInteractionInterface>(OtherActor);
+		ICombatInterface* Interface = Cast<ICombatInterface>(OtherActor);
 		if (Interface)
 		{
 			FDamageData Damage;

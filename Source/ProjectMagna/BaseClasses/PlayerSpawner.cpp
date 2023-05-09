@@ -60,11 +60,13 @@ ABaseCharacter* APlayerSpawner::SpawnPlayer(ABasePlayerController* Player)
 	NewCharacter->CharacterPlayerController = Player;
 	
 	NewCharacter->FinishSpawning(Transform);
+	
 	NewCharacter->SetOwner(Player);
 	Player->SetControlRotation(ArrowComponent->GetComponentRotation());
 	Player->Possess(NewCharacter);
 	Player->SetPlayerGameState(EPlayerGameState::Playing);
 	NewCharacter->SetupCharacter();
+	
 	SetAvailable(false);
 	
 	return NewCharacter;

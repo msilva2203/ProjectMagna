@@ -3,10 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "BasePlayerState.h"
 #include "DeathCamera.h"
 #include "MovieSceneFwd.h"
 #include "GameFramework/PlayerController.h"
 #include "ProjectMagna/ProjectMagna.h"
+#include "ProjectMagna/Interfaces/CombatInterface.h"
 #include "ProjectMagna/Interfaces/MagnaInterface.h"
 #include "BasePlayerController.generated.h"
 
@@ -19,7 +21,7 @@ class ABaseInteractable;
 
 
 UCLASS()
-class PROJECTMAGNA_API ABasePlayerController : public APlayerController, public IMagnaInterface
+class PROJECTMAGNA_API ABasePlayerController : public APlayerController, public IMagnaInterface, public ICombatInterface
 {
 	GENERATED_BODY()
 
@@ -37,12 +39,43 @@ public:
 	virtual void SetupInputComponent() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
+	virtual void OnRep_PlayerState() override;
 
 	UFUNCTION(Client, Reliable)
 	void ClientOnPossess();
 	
 	UFUNCTION(Client, Reliable)
 	void ClientOnUnPossess();
+
+	UFUNCTION()
+	virtual void ShowGameHUD();
+
+	UFUNCTION()
+	virtual void HideGameHUD();
+
+	UFUNCTION()
+	void ShowPauseMenu();
+
+	UFUNCTION()
+	void HidePauseMenu();
+
+	UFUNCTION()
+	void ShowPlayerHUD();
+
+	UFUNCTION()
+	void HidePlayerHUD();
+
+	UFUNCTION()
+	virtual void ShowScoreboard();
+
+	UFUNCTION()
+	virtual void HideScoreboard();
+
+	UFUNCTION(Client, Reliable)
+	virtual void SetupPlayer();
+
+	UFUNCTION(Client, Reliable)
+	virtual void StartPlayer();
 
 	//
 	// Methods
@@ -115,6 +148,9 @@ public:
 	ABaseGameMode* AuthGameMode;
 
 	UPROPERTY()
+	bool bHasStarted;
+
+	UPROPERTY()
 	TArray<AArenaCamera*> ArenaCameras;
 
 	UPROPERTY()
@@ -166,6 +202,7 @@ public:
 
 	ETeam GetTeam() override;
 	FText GetMagnaPlayerName() override;
+	AActor* GetInstigatorPawn() override;
 	
 		//...
 

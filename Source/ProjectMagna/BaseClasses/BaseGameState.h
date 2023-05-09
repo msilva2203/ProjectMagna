@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
+#include "ProjectMagna/ProjectMagna.h"
 #include "BaseGameState.generated.h"
 
 UCLASS()
@@ -22,4 +23,11 @@ protected:
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+
+	void GetLeadingTeam(TArray<int32> Scores, ETeam& Team, int32& BiggestScore);
+
+	virtual void SetTeamScore(const ETeam Team, const int32 NewScore);
+	virtual int32 GetTeamScore(const ETeam Team);
+	virtual void OffsetTeamScore(const ETeam Team, const int32 Offset);
+	
 };

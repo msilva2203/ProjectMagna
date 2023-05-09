@@ -3,6 +3,8 @@
 
 #include "PlayerController_TDM.h"
 
+#include "ProjectMagna/GameStates/GameState_TDM.h"
+
 
 // Sets default values
 APlayerController_TDM::APlayerController_TDM()
@@ -17,6 +19,11 @@ APlayerController_TDM::APlayerController_TDM()
 void APlayerController_TDM::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (GetNetMode() < NM_Client)
+	{
+		GameState_TDM = Cast<AGameState_TDM>(GetWorld()->GetGameState());
+	}
 	
 }
 
@@ -26,3 +33,47 @@ void APlayerController_TDM::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
+void APlayerController_TDM::SetupPlayer_Implementation()
+{
+	Super::SetupPlayer_Implementation();
+
+	CreateGameHUD();
+	HideGameHUD();
+}
+
+void APlayerController_TDM::StartPlayer_Implementation()
+{
+	Super::StartPlayer_Implementation();
+
+	ShowGameHUD();
+	ShowPlayerHUD();
+}
+
+
+void APlayerController_TDM::ShowGameHUD()
+{
+	Super::ShowGameHUD();
+	
+	if (!IsValid(GameHUD_TDM)) return;
+	GameHUD_TDM->SetVisibility(ESlateVisibility::Visible);
+}
+
+void APlayerController_TDM::HideGameHUD()
+{
+	Super::HideGameHUD();
+	
+	if (!IsValid(GameHUD_TDM)) return;
+	GameHUD_TDM->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void APlayerController_TDM::OnPlayerKill(AActor* KilledActor)
+{
+	Super::OnPlayerKill(KilledActor);
+	
+	GameState_TDM->OffsetTeamScore(GetTeam(), 1);
+}
+
+UGameHUD_TDM* APlayerController_TDM::GetGameHUD()
+{
+	return GameHUD_TDM;
+}

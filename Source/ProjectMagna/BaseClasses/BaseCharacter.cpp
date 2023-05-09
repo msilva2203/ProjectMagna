@@ -12,7 +12,6 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Components/CapsuleComponent.h"
-#include "Evaluation/PreAnimatedState/MovieScenePreAnimatedStateTypes.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectMagna/Statics/MagnaAssetManager.h"
@@ -46,8 +45,8 @@ void ABaseCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	
-	DOREPLIFETIME(ABaseCharacter, ActionState);
-	DOREPLIFETIME(ABaseCharacter, CurrentEquipment);
+	DOREPLIFETIME(ABaseCharacter, RepActionState);
+	DOREPLIFETIME(ABaseCharacter, RepEquipment);
 	DOREPLIFETIME(ABaseCharacter, WeaponPrimary);
 	DOREPLIFETIME(ABaseCharacter, WeaponSecondary);
 	DOREPLIFETIME(ABaseCharacter, MaxHealth);
@@ -59,9 +58,12 @@ void ABaseCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 // Sets default values
 ABaseCharacter::ABaseCharacter() :
 	NameplateClass(UPlayerNameplate::StaticClass()),
-	ActionState(EActionState::None),
+	RepActionState(EActionState::None),
+	CurrentActionState(EActionState::None),
 	PreviousActionState(EActionState::None),
 	bIsSpectated(false),
+	RepEquipment(EEquipment::None),
+	CurrentEquipment(EEquipment::None),
 	PreviousEquipment(EEquipment::None),
 	bRegenerating(false),
 	bIsSpotted(false)
@@ -103,12 +105,6 @@ void ABaseCharacter::BeginPlay()
 
 	if (GetWorld()->GetNetMode() < NM_Client)
 	{
-		ServerSetActionState(EActionState::Default, true);
-		ServerPickupWeapon(EWeapon::FS92);
-		ServerPickupWeapon(EWeapon::AK47);
-
-		AuthGamemode = Cast<ABaseGameMode>(GetWorld()->GetAuthGameMode());
-
 		GetWorldTimerManager().SetTimer(SpectatingUpdateTimer, this, &ABaseCharacter::OnSpectatingUpdate, SPECTATING_UPDATE_RATE, true);
 		
 	}
@@ -135,6 +131,26 @@ void ABaseCharacter::Tick(float DeltaTime)
 			const FRotator NewRotation = FMath::RInterpTo(CurrentRotation, SpectatingRotation, DeltaTime, SPECTATING_ROTATION_SPEED);
 			SpringArmComponent->SetWorldRotation(NewRotation);
 		}
+	}
+
+	if (IsValid(GetPlayerState()))
+	{
+		TArray<FString> DebugString;
+		DebugString.Add("Character Team: Team " + FString::FromInt((int32) this->GetTeam()));
+		DebugString.Add("Player Team: Team " + FString::FromInt((int32) Cast<ABasePlayerState>(GetPlayerState())->GetTeam()));
+		DebugString.Add("Health: " + FString::SanitizeFloat(CurrentHealth) + "/" + FString::SanitizeFloat(MaxHealth));
+		if (GetPlayerWeapon(CurrentEquipment))
+		{
+			DebugString.Add("Equipped Weapon: " + GetPlayerWeapon(CurrentEquipment)->WeaponData->WeaponName.ToString());
+		}
+		else
+		{
+			DebugString.Add("Does not have a weapon equipped");
+		}
+		DebugString.Add("State: " + UMagnaStatics::GetActionStateName(CurrentActionState).ToString());
+		DebugString.Add("Previous State: " + UMagnaStatics::GetActionStateName(PreviousActionState).ToString());
+
+		UMagnaStatics::DrawDebugStringLines(this, GetActorLocation(), DebugString);
 	}
 }
 
@@ -175,7 +191,18 @@ void ABaseCharacter::OnRep_PlayerState()
 void ABaseCharacter::SetupCharacter()
 {
 	ABasePlayerController* PlayerController = Cast<ABasePlayerController>(GetWorld()->GetFirstPlayerController());
-	
+
+	// Authority Setup
+	if (GetWorld()->GetNetMode() < NM_Client)
+	{
+		AuthGamemode = Cast<ABaseGameMode>(GetWorld()->GetAuthGameMode());
+		
+		ServerSetActionState(EActionState::Default, true);
+		ServerPickupWeapon(WEAPON_FS);
+		ServerPickupWeapon(WEAPON_M4);
+	}
+
+	// Local and Not Local Setups
 	if (IsLocallyControlled())
 	{
 		// Setup on local client
@@ -216,10 +243,10 @@ void ABaseCharacter::SetupCharacter()
 
 void ABaseCharacter::ServerSetActionState_Implementation(const EActionState NewState, const bool bForceUpdate)
 {
-	if (NewState != ActionState || bForceUpdate)
+	if (NewState != CurrentActionState || bForceUpdate)
 	{
-		ActionState = NewState;
-		OnRep_ActionState();
+		RepActionState = NewState;
+		OnRep_RepActionState();
 	}
 }
 
@@ -320,12 +347,13 @@ void ABaseCharacter::SetAimingState(const bool bNewValue)
 }
 
 
-void ABaseCharacter::OnRep_ActionState()
+void ABaseCharacter::OnRep_RepActionState()
 {
+	PreviousActionState = CurrentActionState;
+	CurrentActionState = RepActionState;
 	SetActionState(PreviousActionState, false);
-	SetActionState(ActionState, true);
-	OnActionStateChanged(PreviousActionState, ActionState);
-	PreviousActionState = ActionState;
+	SetActionState(CurrentActionState, true);
+	OnActionStateChanged(PreviousActionState, CurrentActionState);
 	
 }
 
@@ -351,14 +379,15 @@ void ABaseCharacter::OnSpectatingUpdate()
 }
 
 
-void ABaseCharacter::ServerPickupWeapon_Implementation(const EWeapon Weapon)
+void ABaseCharacter::ServerPickupWeapon_Implementation(const uint8 WeaponID)
 {
 	const FTransform SpawnTransform = GetActorTransform();
-	ABaseWeapon* NewWeapon = GetWorld()->SpawnActorDeferred<ABaseWeapon>(ABaseWeapon::StaticClass(), SpawnTransform);
+	TSubclassOf<ABaseWeapon> WeaponSubclass = AuthGamemode->GetWeaponData(WeaponID)->WeaponClass;
+	ABaseWeapon* NewWeapon = GetWorld()->SpawnActorDeferred<ABaseWeapon>(WeaponSubclass, SpawnTransform);
 	
 	// Weapon Setup here
 	NewWeapon->SetOwner(GetController());
-	NewWeapon->Player = Cast<ABasePlayerController>(GetController());
+	NewWeapon->Player = CharacterPlayerController;
 	NewWeapon->Character = this;
 	NewWeapon->GameWeaponSettings = AuthGamemode->MatchSettings.WeaponSettings;
 
@@ -370,9 +399,11 @@ void ABaseCharacter::ServerPickupWeapon_Implementation(const EWeapon Weapon)
 		break;
 	case EEquipment::Primary:
 		WeaponPrimary = NewWeapon;
+		ServerEquipWeapon(EEquipment::Primary);
 		break;
 	case EEquipment::Secondary:
 		WeaponSecondary = NewWeapon;
+		ServerEquipWeapon(EEquipment::Secondary);
 		break;
 	default:
 		break;
@@ -380,35 +411,49 @@ void ABaseCharacter::ServerPickupWeapon_Implementation(const EWeapon Weapon)
 }
 
 
-void ABaseCharacter::OnRep_CurrentEquipment()
+void ABaseCharacter::OnRep_RepEquipment()
 {
-	EquipWeapon(CurrentEquipment);
+	EquipWeapon(RepEquipment);
 }
 
 void ABaseCharacter::OnRep_WeaponPrimary()
 {
-	EquipWeapon(EEquipment::Primary);
+	if (CurrentEquipment == EEquipment::Primary)
+	{
+		EquipWeapon(EEquipment::Primary, true);
+	}
 }
 
 void ABaseCharacter::OnRep_WeaponSecondary()
 {
-	EquipWeapon(EEquipment::Secondary);
+	if (CurrentEquipment == EEquipment::Secondary)
+	{
+		EquipWeapon(EEquipment::Secondary, true);
+	}
 }
 
 void ABaseCharacter::ServerEquipWeapon_Implementation(const EEquipment NewEquipment)
 {
-	EquipWeapon(NewEquipment);
+	EquipWeapon(NewEquipment, true, true);
 }
 
-void ABaseCharacter::EquipWeapon(const EEquipment NewEquipment)
+void ABaseCharacter::EquipWeapon(const EEquipment NewEquipment, const bool bForce, const bool bReplicate)
 {
-	if (PreviousEquipment != NewEquipment)
+	if (PreviousEquipment != NewEquipment || bForce)
 	{
-		CurrentEquipment = NewEquipment;
+		PreviousEquipment = CurrentEquipment;
+		
+		if (bReplicate)
+		{
+			RepEquipment = NewEquipment;
+		}
+		
 		if (IsValid(GetPlayerWeapon(PreviousEquipment)))
 			GetPlayerWeapon(PreviousEquipment)->UnEquipWeapon(IsLocallyControlled());
-		GetPlayerWeapon(CurrentEquipment)->EquipWeapon(IsLocallyControlled());
-		PreviousEquipment = CurrentEquipment;
+		if (IsValid(GetPlayerWeapon(NewEquipment)))
+			GetPlayerWeapon(NewEquipment)->EquipWeapon(IsLocallyControlled());
+
+		CurrentEquipment = NewEquipment;
 	}
 }
 
@@ -458,19 +503,57 @@ void ABaseCharacter::SetPlayerHealth(const float NewHealth, const bool bDamaged)
 	
 	if (GetNetMode() == NM_ListenServer)
 		OnRep_CurrentHealth();
-	
-	if (bDamaged)
-		StartHealthRegeneration();
 
 	if (CurrentHealth <= 0.0f)
 	{
 		// Player death here
+		StopHealthRegeneration();
+
+		if (IsValid(CurrentInstigator))
+		{
+			ABasePlayerController* Player = Cast<ABasePlayerController>(CurrentInstigator);
+			if (IsValid(Player))
+			{
+				if (Player->GetTeam() != this->GetTeam())
+				{
+					Player->OnPlayerKill(this);
+				}
+			}
+		}
+
+		if (IsValid(CurrentAssistInstigator))
+		{
+			ABasePlayerController* Player = Cast<ABasePlayerController>(CurrentAssistInstigator);
+			if (IsValid(Player))
+			{
+				Player->OnPlayerAssist(this);
+			}
+		}
+
 		Death();
 		NetMulticastDeath();
+	}
+	else
+	{
+		if (bDamaged)
+		{
+				this->StartHealthRegeneration();
+		}
 	}
 }
 
 void ABaseCharacter::StartHealthRegeneration()
+{
+	this->StopHealthRegeneration();
+
+	this->RegenOffset = (MaxHealth - CurrentHealth) / REGEN_UPDATE_TICKS;
+	this->CurrentRegenTick = 0;
+	this->bRegenerating = true;
+	
+	GetWorldTimerManager().SetTimer(RegenerationStartTimer, this, &ABaseCharacter::UpdateHealthRegen, REGEN_START_TIME, false);
+}
+
+void ABaseCharacter::StopHealthRegeneration()
 {
 	if (bRegenerating)
 	{
@@ -478,18 +561,16 @@ void ABaseCharacter::StartHealthRegeneration()
 		{
 			GetWorldTimerManager().ClearTimer(RegenerationStartTimer);
 		}
-		else if (GetWorldTimerManager().IsTimerActive(RegenerationUpdateTimer))
+
+		if (GetWorldTimerManager().IsTimerActive(RegenerationUpdateTimer))
 		{
 			GetWorldTimerManager().ClearTimer(RegenerationUpdateTimer);
 		}
-	}
 
-	this->RegenOffset = (MaxHealth - CurrentHealth) / REGEN_UPDATE_TICKS;
-	this->CurrentRegenTick = 0;
-	bRegenerating = true;
-	
-	GetWorldTimerManager().SetTimer(RegenerationStartTimer, this, &ABaseCharacter::UpdateHealthRegen, REGEN_START_TIME, false);
+		bRegenerating = false;
+	}
 }
+
 
 void ABaseCharacter::UpdateHealthRegen()
 {
@@ -553,7 +634,7 @@ void ABaseCharacter::NetMulticastDeath_Implementation()
 
 void ABaseCharacter::TestVisionEntity(AActor* Entity) const
 {
-	IInteractionInterface* Interface = Cast<IInteractionInterface>(Entity);
+	ICombatInterface* Interface = Cast<ICombatInterface>(Entity);
 	
 	if (Interface)
 	{
@@ -621,7 +702,7 @@ void ABaseCharacter::OnVisionBoxEndOverlap(UPrimitiveComponent* OverlappedComp, 
 	{
 		VisionEntities.Remove(OtherActor);
 
-		IInteractionInterface* Interface = Cast<IInteractionInterface>(OtherActor);
+		ICombatInterface* Interface = Cast<ICombatInterface>(OtherActor);
 		if (Interface)
 		{
 			Interface->SetEntitySpotted(false, false);
@@ -828,10 +909,6 @@ void ABaseCharacter::InputAimReleased()
 void ABaseCharacter::InputEquipPrimary()
 {
 	ServerEquipWeapon(EEquipment::Primary);
-
-	FDamageData Damage;
-	Damage.Damage = 10.0;
-	Cast<ABasePlayerController>(GetWorld()->GetFirstPlayerController())->ServerDamageEntity(this, Damage);
 }
 
 void ABaseCharacter::InputEquipSecondary()
@@ -841,7 +918,7 @@ void ABaseCharacter::InputEquipSecondary()
 
 void ABaseCharacter::InputSprintPressed()
 {
-	if (ActionState != EActionState::Aiming)
+	if (CurrentActionState != EActionState::Aiming)
 	{
 		ServerSetActionState(EActionState::Sprinting);
 	}
@@ -849,7 +926,7 @@ void ABaseCharacter::InputSprintPressed()
 
 void ABaseCharacter::InputSprintReleased()
 {
-	if (ActionState == EActionState::Sprinting)
+	if (CurrentActionState == EActionState::Sprinting)
 	{
 		ServerSetActionState(EActionState::Default);
 	}
@@ -857,7 +934,7 @@ void ABaseCharacter::InputSprintReleased()
 
 void ABaseCharacter::InputSwapShoulder()
 {
-	if (ActionState == EActionState::Aiming)
+	if (CurrentActionState == EActionState::Aiming)
 	{
 		switch (CurrentShoulder)
 		{

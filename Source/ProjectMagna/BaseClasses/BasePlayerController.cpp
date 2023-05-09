@@ -23,6 +23,7 @@ void ABasePlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 
 // Sets default values
 ABasePlayerController::ABasePlayerController() :
+	bHasStarted(false),
 	Gamemode(EGamemode::None),
 	PlayerGameState(EPlayerGameState::Spectating)
 {
@@ -98,6 +99,12 @@ void ABasePlayerController::OnUnPossess()
 	ClientOnUnPossess();
 }
 
+void ABasePlayerController::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+}
+
+
 void ABasePlayerController::ClientOnPossess_Implementation()
 {
 	DeathCamera->SetActive(false);
@@ -119,6 +126,59 @@ void ABasePlayerController::ClientOnUnPossess_Implementation()
 	this->SetViewTarget(DeathCamera, TransitionParams);
 }
 
+void ABasePlayerController::ShowGameHUD()
+{
+}
+
+void ABasePlayerController::HideGameHUD()
+{
+}
+
+void ABasePlayerController::ShowPauseMenu()
+{
+	HideGameHUD();
+	
+}
+
+void ABasePlayerController::HidePauseMenu()
+{
+	ShowGameHUD();
+	
+}
+
+void ABasePlayerController::ShowPlayerHUD()
+{
+	
+}
+
+void ABasePlayerController::HidePlayerHUD()
+{
+	
+}
+
+void ABasePlayerController::ShowScoreboard()
+{
+	HideGameHUD();
+	
+}
+
+void ABasePlayerController::HideScoreboard()
+{
+	ShowGameHUD();
+	
+}
+
+
+void ABasePlayerController::SetupPlayer_Implementation()
+{
+}
+
+void ABasePlayerController::StartPlayer_Implementation()
+{
+	bHasStarted = true;
+	
+}
+
 
 void ABasePlayerController::SetPlayerGameState(const EPlayerGameState NewState)
 {
@@ -130,8 +190,6 @@ void ABasePlayerController::SetPlayerGameState(const EPlayerGameState NewState)
 			GetWorldTimerManager().ClearTimer(SpectatingUpdateTimer);
 	}
 }
-
-
 
 bool ABasePlayerController::IsPlaying() const
 {
@@ -219,7 +277,7 @@ bool ABasePlayerController::SpectateTeammate(int32 TeammateIndex, const bool bFo
 
 void ABasePlayerController::ServerDamageEntity_Implementation(AActor* Entity, FDamageData Damage)
 {
-	IInteractionInterface* Interface = Cast<IInteractionInterface>(Entity);
+	ICombatInterface* Interface = Cast<ICombatInterface>(Entity);
 	if (Interface)
 	{
 		Interface->Damage(this, Damage);
@@ -228,24 +286,31 @@ void ABasePlayerController::ServerDamageEntity_Implementation(AActor* Entity, FD
 
 void ABasePlayerController::OnPlayerKill(AActor* KilledActor)
 {
-	
+	GetPlayerState<ABasePlayerState>()->OffsetKills(1);
 }
 
 void ABasePlayerController::OnPlayerAssist(AActor* AssistedActor)
 {
-	
+	GetPlayerState<ABasePlayerState>()->OffsetAssists(1);
 }
 
 void ABasePlayerController::OnPlayerDeath(AActor* DeathInstigator)
 {
-	CurrentDeathInstigator = DeathInstigator;
-	if (GetWorld()->GetNetMode() == NM_ListenServer && IsLocalPlayerController())
-		DeathCamera->SetDeathInstigator(DeathInstigator);
+	GetPlayerState<ABasePlayerState>()->OffsetDeaths(1);
+
+	ICombatInterface* Interface = Cast<ICombatInterface>(DeathInstigator);
+
+	if (Interface)
+	{
+		CurrentDeathInstigator = Interface->GetInstigatorPawn();
+		if (GetWorld()->GetNetMode() == NM_ListenServer && IsLocalPlayerController())
+			DeathCamera->SetDeathInstigator(CurrentDeathInstigator);
 	
-	const int32 Time = AuthGameMode->GetRespawnTime();
+		const int32 Time = AuthGameMode->GetRespawnTime();
 	
-	StartServerRespawnTimer(Time);
-	ClientOnPlayerDeath(Time);
+		StartServerRespawnTimer(Time);
+		ClientOnPlayerDeath(Time);
+	}
 }
 
 void ABasePlayerController::ClientOnPlayerDeath_Implementation(int32 Time)
@@ -330,6 +395,11 @@ FText ABasePlayerController::GetMagnaPlayerName()
 		return Interface->GetMagnaPlayerName();
 	}
 	return FText::FromString("Magna Player");
+}
+
+AActor* ABasePlayerController::GetInstigatorPawn()
+{
+	return CurrentPawn;
 }
 
 

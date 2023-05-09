@@ -33,6 +33,42 @@ public:
 	
 	UFUNCTION()
 	void OnRep_PlayerTeam();
+
+	UFUNCTION()
+	virtual void OnRep_Kills();
+
+	UFUNCTION()
+	virtual void OnRep_Assists();
+
+	UFUNCTION()
+	virtual void OnRep_Deaths();
+
+	UFUNCTION()
+	virtual void OnRep_PlayerScore();
+
+	UFUNCTION()
+	void SetKills(const int32 NewValue);
+
+	UFUNCTION()
+	void SetAssists(const int32 NewValue);
+
+	UFUNCTION()
+	void SetDeaths(const int32 NewValue);
+
+	UFUNCTION()
+	void SetPlayerScore(const int32 NewValue);
+
+	UFUNCTION()
+	void OffsetKills(const int32 Offset);
+
+	UFUNCTION()
+	void OffsetAssists(const int32 Offset);
+
+	UFUNCTION()
+	void OffsetDeaths(const int32 Offset);
+
+	UFUNCTION()
+	void OffsetPlayerScore(const int32 Offset);
 	
 		//...
 
@@ -45,6 +81,18 @@ public:
 
 	UPROPERTY()
 	FText PlayerClanTag = FText::FromString("DeFy");
+
+	UPROPERTY(ReplicatedUsing = OnRep_Kills)
+	int32 Kills;
+
+	UPROPERTY(ReplicatedUsing = OnRep_Assists)
+	int32 Assists;
+
+	UPROPERTY(ReplicatedUsing = OnRep_Deaths)
+	int32 Deaths;
+
+	UPROPERTY(ReplicatedUsing = OnRep_PlayerScore)
+	int32 PlayerScore;
 	
 		//...
 

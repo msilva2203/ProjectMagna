@@ -18,13 +18,24 @@ public:
 	// Sets default values for this actor's properties
 	AWeaponPickup();
 
+	virtual void BeginPlay() override;
+	
+protected:
+	
+	virtual void Tick(float DeltaSeconds) override;
+
+public:
+
 	virtual void Interact(ABasePlayerController* PlayerController) override;
 
 	UFUNCTION()
 	bool IsPersistent() const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn), Category = "Weapon Pickup")
-	EWeapon Weapon;
+	uint8 WeaponID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn), Category = "Weapon Pickup")
+	EEquipment EquipmentSlot;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn))
 	bool bPersistent;

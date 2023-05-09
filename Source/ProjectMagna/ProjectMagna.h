@@ -71,14 +71,6 @@ enum class EShoulder : uint8
 };
 
 UENUM(BlueprintType)
-enum class EWeapon : uint8
-{
-	Default		UMETA(DisplayName = "Default"),
-	AK47		UMETA(DisplayName = "AK-47"),
-	FS92		UMETA(DisplayName = "FS-92")
-};
-
-UENUM(BlueprintType)
 enum class ETier : uint8
 {
 	Tier1		UMETA(DisplayName = "TIER1"),

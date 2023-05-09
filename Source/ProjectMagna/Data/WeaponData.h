@@ -7,9 +7,16 @@
 #include "ProjectMagna/ProjectMagna.h"
 #include "WeaponData.generated.h"
 
-/**
- * 
- */
+// Forward Declarations
+class ABaseWeapon;
+
+// Weapon IDs
+#define WEAPON_DEFAULT		0
+#define WEAPON_AK			1
+#define WEAPON_FS			2
+#define WEAPON_M4			3
+
+
 UCLASS()
 class PROJECTMAGNA_API UWeaponData : public UDataAsset
 {
@@ -17,7 +24,7 @@ class PROJECTMAGNA_API UWeaponData : public UDataAsset
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Data")
-	EWeapon Weapon;
+	uint8 WeaponID;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Data")
 	EEquipment EquipmentSlot;
@@ -45,6 +52,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Data")
 	FCameraSettings ZoomCameraSettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Data")
+	TSubclassOf<ABaseWeapon> WeaponClass;
 
 	//
 	//	Methods

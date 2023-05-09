@@ -8,6 +8,7 @@
 #include "Engine/AssetManager.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Net/UnrealNetwork.h"
+#include "ProjectMagna/Interactables/WeaponPickup.h"
 #include "ProjectMagna/Statics/MagnaStatics.h"
 
 
@@ -18,7 +19,6 @@ void ABaseWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	
 	DOREPLIFETIME(ABaseWeapon, GameWeaponSettings);
 	DOREPLIFETIME(ABaseWeapon, Character);
-	DOREPLIFETIME(ABaseWeapon, Player);
 }
 
 // Sets default values
@@ -28,30 +28,26 @@ ABaseWeapon::ABaseWeapon() :
 	bLocked(false)
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
+
+	bReplicates = true;
+	bAlwaysRelevant = true;
 
 	InputComponent = CreateDefaultSubobject<UInputComponent>(TEXT("Input Component"));
 	SetupPlayerInputComponent(InputComponent);
 
 	WeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Weapon Mesh"));
-
-	const ConstructorHelpers::FObjectFinder<UWeaponData> Asset(TEXT("/Game/Data/Weapons/DA_AK-47.DA_AK-47"));
-	if (Asset.Succeeded())
-	{
-		WeaponData = Asset.Object;
-	}
-
-	WeaponData->SetGameWeaponSettings(GameWeaponSettings);
-	
-	bReplicates = true;
-	bAlwaysRelevant = true;
-	
 }
 
 // Called when the game starts or when spawned
 void ABaseWeapon::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	if (WeaponData)
+	{
+		WeaponData->SetGameWeaponSettings(GameWeaponSettings);
+	}
 	
 	DisableInput(GetWorld()->GetFirstPlayerController());
 }
@@ -73,9 +69,15 @@ void ABaseWeapon::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 void ABaseWeapon::EquipWeapon(const bool bIsOwner)
 {
 	bOwner = bIsOwner;
+	FString Print = "Equipped " + WeaponData->WeaponName.ToString();
+	GEngine->AddOnScreenDebugMessage(-1, 1.0, TEAM_COLOR_HEROES, Print);
 	
 	if (bIsOwner)
 	{
+		if (!IsValid(Player))
+		{
+			Player = Cast<ABasePlayerController>(GetWorld()->GetFirstPlayerController());
+		}
 		EnableInput(GetWorld()->GetFirstPlayerController());
 	}
 	
@@ -84,6 +86,8 @@ void ABaseWeapon::EquipWeapon(const bool bIsOwner)
 void ABaseWeapon::UnEquipWeapon(const bool bIsOwner)
 {
 	bOwner = bIsOwner;
+	FString Print = "Unequipped " + WeaponData->WeaponName.ToString();
+	GEngine->AddOnScreenDebugMessage(-1, 1.0, TEAM_COLOR_HEROES, Print);
 	
 	if (bIsOwner)
 	{
@@ -104,7 +108,12 @@ void ABaseWeapon::StartShooting()
 		bLocked = true;
 		
 		Shoot();
-		GetWorldTimerManager().SetTimer(FireTimer, this, &ABaseWeapon::Shoot, WeaponData->GetFinalFireRate(), true);
+		if (WeaponData->IsFullAuto())
+			GetWorldTimerManager().SetTimer(FireTimer, this, &ABaseWeapon::Shoot, WeaponData->GetFinalFireRate(), true);
+		else
+		{
+			GetWorldTimerManager().SetTimer(LockTimer, this, &ABaseWeapon::UnlockWeapon, WeaponData->GetFinalFireRate(), false);
+		}
 	}
 }
 
@@ -119,9 +128,7 @@ void ABaseWeapon::Shoot()
 	CurrentBurst = WeaponData->WeaponFireSettings.NumBursts;
 	Burst();
 	
-	if (WeaponData->IsFullAuto())
-		GetWorldTimerManager().SetTimer(BurstTimer, this, &ABaseWeapon::Burst, WeaponData->GetBurstRate(), true);
-
+	GetWorldTimerManager().SetTimer(BurstTimer, this, &ABaseWeapon::Burst, WeaponData->GetBurstRate(), true);
 	GetWorldTimerManager().SetTimer(LockTimer, this, &ABaseWeapon::UnlockWeapon, WeaponData->GetFinalFireRate(), false);
 	
 }
@@ -132,7 +139,7 @@ void ABaseWeapon::Burst()
 	Attack();
 	GEngine->AddOnScreenDebugMessage(-1, 1.0, TEAM_COLOR_HEROES, TEXT("Player is shooting his weapon"));
 
-	if (CurrentBurst == 0)
+	if (CurrentBurst <= 0)
 	{
 		GetWorldTimerManager().ClearTimer(BurstTimer);
 	}
@@ -140,6 +147,12 @@ void ABaseWeapon::Burst()
 
 void ABaseWeapon::Attack() const
 {
+	if (!IsValid(Player))
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 1.0, FColor::Red, TEXT("Weapon Player is not valid!"));
+		return;
+	}
+	
 	FVector StartLocation = Player->PlayerCameraManager->GetCameraLocation();
 	FVector EndLocation = StartLocation + UKismetMathLibrary::GetForwardVector(Player->PlayerCameraManager->GetCameraRotation()) * 5000.0f;
 	FCollisionQueryParams TraceParams;
@@ -147,19 +160,46 @@ void ABaseWeapon::Attack() const
 	TraceParams.bTraceComplex = false;
 
 	FHitResult Result(ForceInit);
-	bool bBlocked = GetWorld()->LineTraceSingleByChannel(Result, StartLocation, EndLocation, ECC_Visibility, TraceParams);
+	bool bBlocked = GetWorld()->LineTraceSingleByChannel(Result, StartLocation, EndLocation, ECC_Pawn, TraceParams);
 
 	if (bBlocked)
 	{
-		IInteractionInterface* Interface = Cast<IInteractionInterface>(Result.GetActor());
-		if (Interface)
+		if (IsValid(Result.GetActor()))
 		{
-			FDamageData DamageData;
-			DamageData.Damage = WeaponData->Damage;
-			Player->ServerDamageEntity(Result.GetActor(), DamageData);
+			IInteractionInterface* Interface = Cast<IInteractionInterface>(Result.GetActor());
+			if (Interface)
+			{
+				FDamageData DamageData;
+				DamageData.Damage = WeaponData->Damage;
+				Player->ServerDamageEntity(Result.GetActor(), DamageData);
+			}
 		}
 	}
 }
+
+void ABaseWeapon::DropWeapon()
+{
+	if (IsValid(Character))
+	{
+		FVector Location = Character->GetActorLocation();
+		FTransform Transform;
+		Transform.SetLocation(Location);
+
+		AWeaponPickup* NewPickup = GetWorld()->SpawnActorDeferred<AWeaponPickup>(AWeaponPickup::StaticClass(), Transform);
+		NewPickup->bPersistent = false;
+		NewPickup->WeaponState = WeaponData->DefaultWeaponState;
+		NewPickup->WeaponID = WeaponData->WeaponID;
+		NewPickup->EquipmentSlot = WeaponData->EquipmentSlot;
+
+		NewPickup->FinishSpawning(Transform);
+
+		if (IsValid(NewPickup))
+		{
+			K2_DestroyActor();
+		}
+	}
+}
+
 
 
 void ABaseWeapon::UnlockWeapon()
@@ -170,13 +210,19 @@ void ABaseWeapon::UnlockWeapon()
 
 void ABaseWeapon::InputShootPressed()
 {
-	bHoldingFire = true;
-	StartShooting();
+	if (bOwner)
+	{
+		bHoldingFire = true;
+		StartShooting();
+	}
 }
 
 void ABaseWeapon::InputShootReleased()
 {
-	bHoldingFire = false;
-	StopShooting();
+	if (bOwner)
+	{
+		bHoldingFire = false;
+		StopShooting();
+	}
 }
 

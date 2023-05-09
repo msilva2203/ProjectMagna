@@ -6,6 +6,9 @@
 #include "ProjectMagna/BaseClasses/BaseGameMode.h"
 #include "GameMode_TDM.generated.h"
 
+// Forward Declarations
+class AGameState_TDM;
+
 UCLASS()
 class PROJECTMAGNA_API AGameMode_TDM : public ABaseGameMode
 {
@@ -22,4 +25,12 @@ protected:
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+
+	virtual void StartGame() override;
+	virtual void EndGame() override;
+	virtual void GameTimeCallback() override;
+
+public:
+	UPROPERTY()
+	AGameState_TDM* GameState_TDM;
 };

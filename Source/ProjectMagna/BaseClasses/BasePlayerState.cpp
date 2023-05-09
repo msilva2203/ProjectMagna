@@ -46,6 +46,83 @@ void ABasePlayerState::OnRep_PlayerTeam()
 	
 }
 
+void ABasePlayerState::OnRep_Kills()
+{
+}
+
+void ABasePlayerState::OnRep_Assists()
+{
+}
+
+void ABasePlayerState::OnRep_Deaths()
+{
+}
+
+void ABasePlayerState::OnRep_PlayerScore()
+{
+}
+
+void ABasePlayerState::SetKills(const int32 NewValue)
+{
+	Kills = NewValue;
+
+	if (GetNetMode() == NM_ListenServer)
+	{
+		OnRep_Kills();
+	}
+}
+
+void ABasePlayerState::SetAssists(const int32 NewValue)
+{
+	Assists = NewValue;
+
+	if (GetNetMode() == NM_ListenServer)
+	{
+		OnRep_Assists();
+	}
+}
+
+void ABasePlayerState::SetDeaths(const int32 NewValue)
+{
+	Deaths = NewValue;
+
+	if (GetNetMode() == NM_ListenServer)
+	{
+		OnRep_Deaths();
+	}
+}
+
+void ABasePlayerState::SetPlayerScore(const int32 NewValue)
+{
+	PlayerScore = NewValue;
+
+	if (GetNetMode() == NM_ListenServer)
+	{
+		OnRep_PlayerScore();
+	}
+}
+
+void ABasePlayerState::OffsetKills(const int32 Offset)
+{
+	SetKills(Kills * Offset);
+}
+
+void ABasePlayerState::OffsetAssists(const int32 Offset)
+{
+	SetAssists(Assists + Offset);
+}
+
+void ABasePlayerState::OffsetDeaths(const int32 Offset)
+{
+	SetDeaths(Deaths + Offset);
+}
+
+void ABasePlayerState::OffsetPlayerScore(const int32 Offset)
+{
+	SetPlayerScore(PlayerScore + Offset);
+}
+
+
 
 //
 // Interfaces
