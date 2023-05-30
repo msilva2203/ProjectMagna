@@ -33,4 +33,10 @@ public:
 public:
 	UPROPERTY()
 	AGameState_TDM* GameState_TDM;
+
+public:
+	virtual void game_set_time(int32 value) override;
+	virtual void game_set_goal(int32 value) override;
+	virtual void game_set_teamscore(int32 team, int32 value) override;
+	
 };

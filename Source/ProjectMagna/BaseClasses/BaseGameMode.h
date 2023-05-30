@@ -74,6 +74,9 @@ public:
 	int32 MinPlayers;
 
 	UPROPERTY()
+	bool bGameRunning;
+
+	UPROPERTY()
 	TArray<APlayerSpawner*> PlayerSpawners;
 
 	UPROPERTY()
@@ -97,4 +100,27 @@ public:
 	FTimerHandle GameClockTimer;
 	
 		//...
+
+public:
+	UFUNCTION(Exec)
+	void game_start();
+
+	UFUNCTION(Exec)
+	void game_end();
+
+	UFUNCTION(Exec)
+	void game_set_friendlyfire(bool value);
+
+	UFUNCTION(Exec)
+	void game_set_respawntime(int32 value);
+
+	UFUNCTION(Exec)
+	virtual void game_set_time(int32 value);
+
+	UFUNCTION(Exec)
+	virtual void game_set_goal(int32 value);
+
+	UFUNCTION(Exec)
+	virtual void game_set_teamscore(int32 team, int32 value);
+	
 };

@@ -5,7 +5,6 @@
 
 #include "BaseCharacter.h"
 #include "BasePlayerController.h"
-#include "Engine/AssetManager.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Net/UnrealNetwork.h"
 #include "ProjectMagna/Interactables/WeaponPickup.h"
@@ -16,13 +15,16 @@
 void ABaseWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	
+
+	DOREPLIFETIME(ABaseWeapon, WeaponState);
 	DOREPLIFETIME(ABaseWeapon, GameWeaponSettings);
 	DOREPLIFETIME(ABaseWeapon, Character);
 }
 
 // Sets default values
 ABaseWeapon::ABaseWeapon() :
+	CurrentMag(0),
+	CurrentReserves(0),
 	bOwner(false),
 	bHoldingFire(false),
 	bLocked(false)
@@ -126,9 +128,18 @@ void ABaseWeapon::StopShooting()
 void ABaseWeapon::Shoot()
 {
 	CurrentBurst = WeaponData->WeaponFireSettings.NumBursts;
-	Burst();
+
+	if (CurrentMag > 0)
+	{
+		Burst();
+		GetWorldTimerManager().SetTimer(BurstTimer, this, &ABaseWeapon::Burst, WeaponData->GetBurstRate(), true);
+	}
+	else
+	{
+		StopShooting();
+		Reload();
+	}
 	
-	GetWorldTimerManager().SetTimer(BurstTimer, this, &ABaseWeapon::Burst, WeaponData->GetBurstRate(), true);
 	GetWorldTimerManager().SetTimer(LockTimer, this, &ABaseWeapon::UnlockWeapon, WeaponData->GetFinalFireRate(), false);
 	
 }
@@ -136,6 +147,9 @@ void ABaseWeapon::Shoot()
 void ABaseWeapon::Burst()
 {
 	CurrentBurst--;
+	CurrentMag--;
+	CurrentReserves--;
+	
 	Attack();
 	GEngine->AddOnScreenDebugMessage(-1, 1.0, TEAM_COLOR_HEROES, TEXT("Player is shooting his weapon"));
 
@@ -177,27 +191,92 @@ void ABaseWeapon::Attack() const
 	}
 }
 
+void ABaseWeapon::Reload()
+{
+	int32 MagOffset = WeaponData->MaxWeaponState.Mag - CurrentMag;
+	if (CurrentReserves >= MagOffset)
+	{
+		CurrentMag += MagOffset;
+	}
+	else
+	{
+		CurrentMag += CurrentReserves;
+	}
+
+	this->UpdateWeaponState();
+}
+
+void ABaseWeapon::UpdateWeaponState()
+{
+	FWeaponState NewWeaponState;
+	NewWeaponState.Mag = CurrentMag;
+	NewWeaponState.Reserves = CurrentReserves;
+	
+	ServerSetWeaponState(NewWeaponState);
+}
+
+
+
 void ABaseWeapon::DropWeapon()
 {
 	if (IsValid(Character))
 	{
-		FVector Location = Character->GetActorLocation();
-		FTransform Transform;
-		Transform.SetLocation(Location);
-
-		AWeaponPickup* NewPickup = GetWorld()->SpawnActorDeferred<AWeaponPickup>(AWeaponPickup::StaticClass(), Transform);
-		NewPickup->bPersistent = false;
-		NewPickup->WeaponState = WeaponData->DefaultWeaponState;
-		NewPickup->WeaponID = WeaponData->WeaponID;
-		NewPickup->EquipmentSlot = WeaponData->EquipmentSlot;
-
-		NewPickup->FinishSpawning(Transform);
-
-		if (IsValid(NewPickup))
+		if (IsEmpty())
 		{
 			K2_DestroyActor();
 		}
+		else
+		{
+			FVector Location = Character->GetActorLocation();
+			FTransform Transform;
+			Transform.SetLocation(Location);
+
+			AWeaponPickup* NewPickup = GetWorld()->SpawnActorDeferred<AWeaponPickup>(AWeaponPickup::StaticClass(), Transform);
+			NewPickup->bPersistent = false;
+			NewPickup->WeaponState = WeaponState;
+			NewPickup->WeaponID = WeaponData->WeaponID;
+			NewPickup->EquipmentSlot = WeaponData->EquipmentSlot;
+
+			NewPickup->FinishSpawning(Transform);
+
+			if (IsValid(NewPickup))
+			{
+				K2_DestroyActor();
+			}
+		}
 	}
+}
+
+void ABaseWeapon::ServerSetWeaponState_Implementation(const FWeaponState NewState)
+{
+	WeaponState = NewState;
+	if (GetNetMode() == NM_ListenServer)
+	{
+		OnRep_WeaponState();
+	}
+}
+
+void ABaseWeapon::AddAmmo(int32 Ammo)
+{
+	if (GetNetMode() < NM_Client)
+	{
+		WeaponState.Reserves += FMath::Clamp<int32>(WeaponState.Reserves + Ammo, 0, WeaponData->MaxWeaponState.Reserves);
+		ServerSetWeaponState(WeaponState);
+	}
+}
+
+bool ABaseWeapon::IsEmpty()
+{
+	return WeaponState.Reserves <= 0;
+}
+
+
+
+void ABaseWeapon::OnRep_WeaponState()
+{
+	CurrentMag = WeaponState.Mag;
+	CurrentReserves = WeaponState.Reserves;
+	
 }
 
 
@@ -223,6 +302,7 @@ void ABaseWeapon::InputShootReleased()
 	{
 		bHoldingFire = false;
 		StopShooting();
+		UpdateWeaponState();
 	}
 }
 

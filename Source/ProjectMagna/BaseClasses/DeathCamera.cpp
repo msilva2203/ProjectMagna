@@ -14,6 +14,7 @@ ADeathCamera::ADeathCamera() :
 	PrimaryActorTick.bCanEverTick = true;
 
 	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
+	CameraComponent->bAutoActivate = false;
 }
 
 // Called when the game starts or when spawned
@@ -41,6 +42,15 @@ void ADeathCamera::Tick(float DeltaTime)
 void ADeathCamera::SetActive(const bool bNewValue)
 {
 	bActive = bNewValue;
+
+	if (bActive)
+	{
+		CameraComponent->Activate();
+	}
+	else
+	{
+		CameraComponent->Deactivate();
+	}
 }
 
 void ADeathCamera::SetDeathInstigator(AActor* InDeathInstigator)

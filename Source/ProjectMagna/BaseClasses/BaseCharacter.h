@@ -287,6 +287,7 @@ public:
 	virtual bool IsPlayer() override;
 	virtual bool IsLocalPlayer() override;
 	virtual void TestEntityInteractables() override;
+	virtual AActor* GetInstigatorPawn() override;
 	
 	
 		//...

@@ -60,12 +60,39 @@ public:
 	void Attack() const;
 
 	UFUNCTION()
+	void Reload();
+	
+	UFUNCTION()
+	void UpdateWeaponState();
+
+	UFUNCTION()
 	void DropWeapon();
+
+	UFUNCTION(Server, Reliable)
+	void ServerSetWeaponState(const FWeaponState NewState);
+
+	UFUNCTION()
+	void AddAmmo(int32 Ammo);
+
+	UFUNCTION()
+	bool IsEmpty();
+
+	UFUNCTION()
+	void OnRep_WeaponState();
 
 
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Data")
 	UWeaponData* WeaponData;
+
+	UPROPERTY(ReplicatedUsing = OnRep_WeaponState)
+	FWeaponState WeaponState;
+
+	UPROPERTY()
+	int32 CurrentMag;
+
+	UPROPERTY()
+	int32 CurrentReserves;
 
 	UPROPERTY()
 	UStaticMeshComponent* WeaponMesh;

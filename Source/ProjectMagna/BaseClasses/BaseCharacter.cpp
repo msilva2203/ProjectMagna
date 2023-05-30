@@ -142,6 +142,7 @@ void ABaseCharacter::Tick(float DeltaTime)
 		if (GetPlayerWeapon(CurrentEquipment))
 		{
 			DebugString.Add("Equipped Weapon: " + GetPlayerWeapon(CurrentEquipment)->WeaponData->WeaponName.ToString());
+			DebugString.Add("Weapon State: " + FString::FromInt(GetPlayerWeapon(CurrentEquipment)->CurrentMag) + "/" + FString::FromInt(GetPlayerWeapon(CurrentEquipment)->CurrentReserves));
 		}
 		else
 		{
@@ -198,8 +199,15 @@ void ABaseCharacter::SetupCharacter()
 		AuthGamemode = Cast<ABaseGameMode>(GetWorld()->GetAuthGameMode());
 		
 		ServerSetActionState(EActionState::Default, true);
+		
+		// Gives default Secondary Weapon to player and sets default weapon state
 		ServerPickupWeapon(WEAPON_FS);
+		WeaponSecondary->ServerSetWeaponState(AuthGamemode->GetWeaponData(WEAPON_FS)->DefaultWeaponState);
+
+		// Gives default Primary Weapon to player and sets default weapon state
 		ServerPickupWeapon(WEAPON_M4);
+		WeaponPrimary->ServerSetWeaponState(AuthGamemode->GetWeaponData(WEAPON_M4)->DefaultWeaponState);
+		
 	}
 
 	// Local and Not Local Setups
@@ -408,6 +416,7 @@ void ABaseCharacter::ServerPickupWeapon_Implementation(const uint8 WeaponID)
 	default:
 		break;
 	}
+	
 }
 
 
@@ -615,9 +624,7 @@ void ABaseCharacter::Death()
 		ABasePlayerController* PlayerController = Cast<ABasePlayerController>(GetWorld()->GetFirstPlayerController());
 		if (PlayerController)
 		{
-			if (GetTeam() == PlayerController->GetTeam())
-				PlayerController->RemoveTeammate(this);
-			
+			PlayerController->RemoveTeammate(this);
 		}
 	}
 
@@ -858,6 +865,11 @@ bool ABaseCharacter::IsLocalPlayer()
 void ABaseCharacter::TestEntityInteractables()
 {
 	TestInteractables();
+}
+
+AActor* ABaseCharacter::GetInstigatorPawn()
+{
+	return this;
 }
 
 

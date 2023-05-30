@@ -16,11 +16,13 @@
 // Sets default values
 ABaseGameMode::ABaseGameMode() :
 	NumTeams(2),
-	MinPlayers(3)
+	MinPlayers(3),
+	bGameRunning(false)
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
+	DefaultPawnClass = nullptr;
 	GameStateClass = ABaseGameState::StaticClass();
 	PlayerStateClass = ABasePlayerState::StaticClass();
 	PlayerControllerClass = ABasePlayerController::StaticClass();
@@ -114,10 +116,10 @@ void ABaseGameMode::HandleStartingNewPlayer_Implementation(APlayerController* Ne
 		Player->SetupPlayer();
 	}
 
-	if (!GetWorldTimerManager().IsTimerActive(GameStartTimer))
-	{
-		GetWorldTimerManager().SetTimer(GameStartTimer, this, &ABaseGameMode::StartGame, 5.0, false);
-	}
+	//if (!GetWorldTimerManager().IsTimerActive(GameStartTimer))
+	//{
+	//	GetWorldTimerManager().SetTimer(GameStartTimer, this, &ABaseGameMode::StartGame, 5.0, false);
+	//}
 }
 
 void ABaseGameMode::Logout(AController* Exiting)
@@ -132,15 +134,23 @@ void ABaseGameMode::Logout(AController* Exiting)
 
 void ABaseGameMode::StartGame()
 {
-	GEngine->AddOnScreenDebugMessage(-1, 2.0, FColor::Yellow, TEXT("Game Started"));
-	GetWorldTimerManager().SetTimer(GameClockTimer, this, &ABaseGameMode::GameTimeCallback, 1.0, true);
-	SpawnPlayers(Players, true);
-	
+	if (!bGameRunning)
+	{
+		bGameRunning = true;
+		
+		GEngine->AddOnScreenDebugMessage(-1, 2.0, FColor::Yellow, TEXT("Game Started"));
+		GetWorldTimerManager().SetTimer(GameClockTimer, this, &ABaseGameMode::GameTimeCallback, 1.0, true);
+		SpawnPlayers(Players, true);
+	}
 }
 
 void ABaseGameMode::EndGame()
 {
-	
+	if (bGameRunning)
+	{
+		bGameRunning = false;
+		
+	}
 }
 
 void ABaseGameMode::SpawnPlayers(const TArray<ABasePlayerController*>& PlayersToSpawn, bool bUsePlayerTeam)
@@ -237,4 +247,47 @@ UWeaponData* ABaseGameMode::GetWeaponData(uint8 InWeaponID)
 
 void ABaseGameMode::GameTimeCallback()
 {
+}
+
+// Debug Commands
+
+void ABaseGameMode::game_start()
+{
+	this->StartGame();
+}
+
+void ABaseGameMode::game_end()
+{
+	this->EndGame();
+}
+
+void ABaseGameMode::game_set_friendlyfire(bool value)
+{
+	MatchSettings.bFriendlyFire = value;
+}
+
+void ABaseGameMode::game_set_respawntime(int32 value)
+{
+	value = FMath::Clamp<int32>(value, 0, 100);
+	MatchSettings.RespawnTime = value;
+}
+
+void ABaseGameMode::game_set_time(int32 value)
+{
+	value = FMath::Clamp<int32>(value, 0, 999999);
+	if (value == 0)
+	{
+		this->EndGame();
+	}
+}
+
+
+void ABaseGameMode::game_set_goal(int32 value)
+{
+	
+}
+
+void ABaseGameMode::game_set_teamscore(int32 team, int32 value)
+{
+	
 }

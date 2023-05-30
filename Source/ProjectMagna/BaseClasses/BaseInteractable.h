@@ -47,7 +47,9 @@ public:
 	UFUNCTION()
 	void OnRep_Active();
 
-	UPROPERTY()
+public:
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UBoxComponent* BoxComponent;
 
 	UPROPERTY()

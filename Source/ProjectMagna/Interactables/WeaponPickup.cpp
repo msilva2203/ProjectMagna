@@ -4,7 +4,6 @@
 #include "WeaponPickup.h"
 
 #include "Kismet/KismetStringLibrary.h"
-#include "Kismet/KismetSystemLibrary.h"
 #include "ProjectMagna/BaseClasses/BaseWeapon.h"
 #include "ProjectMagna/BaseClasses/BaseCharacter.h"
 #include "ProjectMagna/BaseClasses/BasePlayerController.h"
@@ -15,7 +14,9 @@ AWeaponPickup::AWeaponPickup() :
 	bPersistent(false)
 {
 	PrimaryActorTick.bCanEverTick = true;
-	
+
+	BoxComponent->SetBoxExtent(FVector(80.0, 80.0, 80.0));
+	BoxComponent->SetHiddenInGame(false);
 }
 
 void AWeaponPickup::BeginPlay()
@@ -56,18 +57,29 @@ void AWeaponPickup::Interact(ABasePlayerController* PlayerController)
 			{
 				if (CurrentPlayerWeapon->WeaponData->WeaponID != WeaponID)
 				{
+					// Player is picking up a different weapon than the one he has equipped
 					CurrentPlayerWeapon->DropWeapon();
+					
 					PlayerCharacter->ServerPickupWeapon(WeaponID);
+					ABaseWeapon* NewWeapon = PlayerCharacter->GetPlayerWeapon(EquipmentSlot);
+					
+					if (IsValid(NewWeapon))
+						NewWeapon->ServerSetWeaponState(WeaponState);
 				}
 				else
 				{
-					CurrentPlayerWeapon->K2_DestroyActor();
-					PlayerCharacter->ServerPickupWeapon(WeaponID);
+					// Player is picking up ammunition for a weapon he already has equipped
+					CurrentPlayerWeapon->AddAmmo(WeaponState.Reserves);
+					
 				}
 			}
 			else
 			{
 				PlayerCharacter->ServerPickupWeapon(WeaponID);
+				ABaseWeapon* NewWeapon = PlayerCharacter->GetPlayerWeapon(EquipmentSlot);
+
+				if (IsValid(NewWeapon))
+					NewWeapon->ServerSetWeaponState(WeaponState);
 			}
 		}
 

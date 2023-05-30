@@ -29,13 +29,16 @@ ABasePlayerController::ABasePlayerController() :
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-	
+
+	bAutoManageActiveCameraTarget = false;
 }
 
 // Called when the game starts or when spawned
 void ABasePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+
+	bAutoManageActiveCameraTarget = false;
 
 	if (GetWorld()->GetNetMode() < NM_Client)
 	{
@@ -90,6 +93,17 @@ void ABasePlayerController::OnPossess(APawn* InPawn)
 	}
 	
 	CurrentPawn = InPawn;
+
+	if (IsLocalController())
+	{
+		if (IsValid(GetPawn()))
+		{
+			FViewTargetTransitionParams TransitionParams;
+			TransitionParams.BlendTime = 0.0f;
+	
+			this->SetViewTarget(GetPawn(), TransitionParams);
+		}
+	}
 }
 
 void ABasePlayerController::OnUnPossess()
@@ -104,26 +118,29 @@ void ABasePlayerController::OnRep_PlayerState()
 	Super::OnRep_PlayerState();
 }
 
+void ABasePlayerController::OnRep_Pawn()
+{
+	Super::OnRep_Pawn();
+	
+	if (IsValid(GetPawn()))
+	{
+		FViewTargetTransitionParams TransitionParams;
+		TransitionParams.BlendTime = 0.0f;
+	
+		this->SetViewTarget(GetPawn(), TransitionParams);
+	}
+}
+
 
 void ABasePlayerController::ClientOnPossess_Implementation()
 {
-	DeathCamera->SetActive(false);
-	
+	SetPlayerGameState(EPlayerGameState::Playing);
 }
 
 
 void ABasePlayerController::ClientOnUnPossess_Implementation()
 {
-	FViewTargetTransitionParams TransitionParams;
-	TransitionParams.BlendTime = 0.0;
-
-	DeathCamera->SetActive(true);
-	const FVector CameraLocation = this->PlayerCameraManager->GetCameraLocation();
-	const FRotator CameraRotation = this->PlayerCameraManager->GetCameraRotation();
-	DeathCamera->CameraComponent->SetWorldRotation(CameraRotation);
-	DeathCamera->SetActorLocation(CameraLocation);
 	
-	this->SetViewTarget(DeathCamera, TransitionParams);
 }
 
 void ABasePlayerController::ShowGameHUD()
@@ -176,20 +193,56 @@ void ABasePlayerController::SetupPlayer_Implementation()
 void ABasePlayerController::StartPlayer_Implementation()
 {
 	bHasStarted = true;
-	
 }
-
 
 void ABasePlayerController::SetPlayerGameState(const EPlayerGameState NewState)
 {
+	if (!IsLocalPlayerController())
+		return;
+	
 	PlayerGameState = NewState;
 
-	if (PlayerGameState == EPlayerGameState::Playing)
+	switch (PlayerGameState)
 	{
-		if (GetWorldTimerManager().IsTimerActive(SpectatingUpdateTimer))
-			GetWorldTimerManager().ClearTimer(SpectatingUpdateTimer);
+	case EPlayerGameState::Playing:
+		{
+			DeathCamera->SetActive(false);
+			
+			if (GetWorldTimerManager().IsTimerActive(SpectatingUpdateTimer))
+				GetWorldTimerManager().ClearTimer(SpectatingUpdateTimer);
+
+			break;
+		}
+
+	case EPlayerGameState::Spectating:
+		{
+			DeathCamera->SetActive(true);
+			const FVector CameraLocation = this->PlayerCameraManager->GetCameraLocation();
+			const FRotator CameraRotation = this->PlayerCameraManager->GetCameraRotation();
+			DeathCamera->CameraComponent->SetWorldRotation(CameraRotation);
+			DeathCamera->SetActorLocation(CameraLocation);
+
+			FViewTargetTransitionParams TransitionParams;
+			TransitionParams.BlendTime = 0.1;
+			this->SetViewTarget(DeathCamera, TransitionParams);
+			
+			GetWorldTimerManager().SetTimer(SpectatingUpdateTimer, this, &ABasePlayerController::UpdateSpectating, 3.0, false);
+			
+			break;
+		}
+
+	default:
+		return;
 	}
 }
+
+void ABasePlayerController::SetDeathView()
+{
+	FViewTargetTransitionParams TransitionParams;
+	TransitionParams.BlendTime = 1.0;
+	this->SetViewTarget(DeathCamera, TransitionParams);
+}
+
 
 bool ABasePlayerController::IsPlaying() const
 {
@@ -319,8 +372,6 @@ void ABasePlayerController::ClientOnPlayerDeath_Implementation(int32 Time)
 	StartClientRespawnTimer(Time);
 	SetPlayerGameState(EPlayerGameState::Spectating);
 	
-	GetWorldTimerManager().SetTimer(SpectatingUpdateTimer, this, &ABasePlayerController::UpdateSpectating, 3.0, false);
-	
 }
 
 void ABasePlayerController::StartServerRespawnTimer(int32 Time)
@@ -357,14 +408,17 @@ void ABasePlayerController::OnRep_CurrentDeathInstigator()
 
 void ABasePlayerController::UpdateSpectating()
 {
-	if (!Teammates.IsEmpty())
+	if (IsSpectating())
 	{
-		if (!SpectateTeammate(CurrentTeammateIndex, true))
+		if (!Teammates.IsEmpty())
+		{
+			if (!SpectateTeammate(CurrentTeammateIndex, true))
+				SpectateArenaCamera(CurrentCameraIndex, true);
+		}
+		else
+		{
 			SpectateArenaCamera(CurrentCameraIndex, true);
-	}
-	else
-	{
-		SpectateArenaCamera(CurrentCameraIndex, true);
+		}
 	}
 }
 
@@ -448,3 +502,18 @@ void ABasePlayerController::InputPreviousPlayerPressed()
 	}
 }
 
+// Debug Commands
+
+void ABasePlayerController::client_suicide()
+{
+	if (IsValid(GetPawn()))
+	{
+		if (ICombatInterface* Interface = Cast<ICombatInterface>(GetPawn()))
+		{
+			FDamageData Damage;
+			Damage.Damage = Interface->GetCurrentHealth();
+			
+			ServerDamageEntity(GetPawn(), Damage);
+		}
+	}
+}

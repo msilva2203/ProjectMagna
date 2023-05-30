@@ -36,10 +36,12 @@ protected:
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	
 	virtual void SetupInputComponent() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
 	virtual void OnRep_PlayerState() override;
+	virtual void OnRep_Pawn() override;
 
 	UFUNCTION(Client, Reliable)
 	void ClientOnPossess();
@@ -138,6 +140,9 @@ public:
 	UFUNCTION(Server, Reliable)
 	void ServerInteract(ABaseInteractable* InInteractable);
 
+	UFUNCTION()
+	void SetDeathView();
+
 		//...
 
 	//
@@ -214,4 +219,9 @@ public:
 	void InputPreviousCameraPressed();
 	void InputNextPlayerPressed();
 	void InputPreviousPlayerPressed();
+
+public:
+	UFUNCTION(Exec)
+	void client_suicide();
+	
 };

@@ -60,4 +60,32 @@ void AGameMode_TDM::GameTimeCallback()
 	GameState_TDM->OffsetTimeRemaining(-1);
 }
 
+// Debug Commands
+
+void AGameMode_TDM::game_set_time(int32 value)
+{
+	Super::game_set_time(value);
+	
+	GameState_TDM->SetTimeRemaining(value);
+}
+
+
+void AGameMode_TDM::game_set_goal(int32 value)
+{
+	Super::game_set_goal(value);
+	
+	GameState_TDM->SetGoalObjective(value);
+}
+
+void AGameMode_TDM::game_set_teamscore(int32 team, int32 value)
+{
+	if (team <= NumTeams)
+	{
+		value = FMath::Clamp<int32>(value, 0, 999999);
+		team = FMath::Clamp<int32>(team, 0, NumTeams);
+		ETeam Team = (ETeam)team;
+
+		GameState_TDM->SetTeamScore(Team, value);
+	}
+}
 
